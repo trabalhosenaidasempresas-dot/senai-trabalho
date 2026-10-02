@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Button, TextField, Box, FormHelperText, FormControlLabel, Checkbox } from '@mui/material';
+import { Button, TextField, Box, FormHelperText, FormControlLabel, Checkbox, MenuItem } from '@mui/material';
 import * as yup from 'yup';
 import CameraCapture from './CameraCapture';
+import { DOCUMENT_CATEGORY_OPTIONS } from '../../constants/documentCategories';
 
 const buildDefaultValues = (defaultValues = {}) => {
   const normalized = {
@@ -148,6 +149,20 @@ export const DocumentForm = ({ defaultValues = {}, onSubmit, isEdit = false }) =
         error={Boolean(errors.fornecedor)}
         helperText={errors.fornecedor}
       />
+
+      <TextField
+        select
+        label="Categoria"
+        fullWidth
+        value={values.categoria}
+        onChange={(event) => handleFieldChange('categoria', event.target.value)}
+        error={Boolean(errors.categoria)}
+        helperText={errors.categoria}
+      >
+        {DOCUMENT_CATEGORY_OPTIONS.map((option) => (
+          <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>
+        ))}
+      </TextField>
 
       <TextField
         label="Data do documento"

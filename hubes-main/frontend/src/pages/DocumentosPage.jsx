@@ -6,6 +6,7 @@ import { useSnackbar } from '../components/common/SnackbarProvider';
 import PageHeader from '../components/common/PageHeader';
 import DocumentForm from '../components/common/DocumentForm';
 import DataTable from '../components/common/DataTable';
+import { DOCUMENT_CATEGORY_OPTIONS } from '../constants/documentCategories';
 
 const normalizeUploadUrl = (url) => {
   if (!url) return url;
@@ -37,17 +38,7 @@ export const DocumentosPage = () => {
     return res;
   };
 
-  const categoryOptions = [
-    { value: 'Contratos', label: 'Contrato' },
-    { value: 'Servicos', label: 'Serviço' },
-    { value: 'Manutencoes', label: 'Manutenção' },
-    { value: 'Inventario', label: 'Inventário' },
-    { value: 'Relatorios', label: 'Relatório' },
-    { value: 'Alvaras', label: 'Alvará' },
-    { value: 'Seguranca', label: 'Segurança' },
-    { value: 'Limpeza', label: 'Limpeza' },
-    { value: 'Outros', label: 'Outros' },
-  ];
+  const categoryOptions = DOCUMENT_CATEGORY_OPTIONS;
   const categoryLabels = Object.fromEntries(categoryOptions.map((option) => [option.value, option.label]));
   const [categoriaFilter, setCategoriaFilter] = useState('');
   const [dateFrom, setDateFrom] = useState('');
