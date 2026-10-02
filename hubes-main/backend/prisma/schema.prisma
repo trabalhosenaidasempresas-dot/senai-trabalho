@@ -1,0 +1,724 @@
+// SIGA Secult - Sistema de Gestão Administrativo
+// Prisma Schema com suporte completo a PostgreSQL
+// Documentação: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-1.1.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ========================================
+// 1. USUÁRIOS E PERMISSÕES
+// ========================================
+
+/// Tabela de Usuários do Sistema
+model Usuario {
+  id           String    @id @default(cuid())
+  nome         String    @db.VarChar(255)
+  email        String    @unique @db.VarChar(255)
+  senha        String    @db.VarChar(255)
+  telefone     String?   @db.VarChar(20)
+  setor        String?   @db.VarChar(100)
+  perfil       String    @default("Servidor") @db.VarChar(50) // Administrador, Gestor, Servidor, Visitante
+  status       String    @default("Ativo") @db.VarChar(50) // Ativo, Inativo, Bloqueado
+  foto               String?   @db.VarChar(500)
+  refreshToken       String?   @db.VarChar(500)
+  passwordResetToken String?   @db.VarChar(500)
+  passwordResetExpires DateTime?
+  criadoPor          String?   @db.VarChar(255)
+  atualizadoPor       String?   @db.VarChar(255)
+  deletadoPor         String?   @db.VarChar(255)
+  deletadoEm          DateTime?
+  ultimoLogin        DateTime?
+  ativo              Boolean   @default(true)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  // Relacionamentos
+  documentos   Documento[]
+  compras      Compra[]
+  eventos      Evento[]
+  ocorrencias  Ocorrencia[]
+  servicos     Servico[]
+  ocorrenciaComentarios OcorrenciaComentario[]
+  comunicados  Comunicado[]
+  mensagensEnviadas Mensagem[] @relation("remetente")
+  mensagensRecebidas Mensagem[] @relation("destinatario")
+  notificacoes Notificacao[]
+  permissoes   Permissao[]
+  logs         Log[]
+  assinaturasDigitais AssinaturaDigital[]
+  aprovacoesConcedidas AprovacaoCompra[] @relation("aprovacoesConcedidas")
+  movimentacoesEstoque MovimentacaoEstoque[]
+
+  @@index([email])
+  @@index([perfil])
+  @@index([status])
+  @@index([setor])
+  @@map("usuarios")
+}
+
+/// Tabela de Permissões do Sistema
+model Permissao {
+  id          String   @id @default(cuid())
+  usuarioId   String
+  usuario     Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  modulo      String   @db.VarChar(100) // usuarios, documentos, compras, estoque, agenda, ocorrencias, comunicacao
+  acao        String   @db.VarChar(50)  // criar, ler, atualizar, deletar, aprovar, exportar
+  concedido   Boolean  @default(false)
+  dataConcessao DateTime @default(now())
+  validoAte   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([usuarioId, modulo, acao])
+  @@index([usuarioId])
+  @@index([modulo])
+  @@map("permissoes")
+}
+
+// ========================================
+// 2. DOCUMENTOS
+// ========================================
+
+/// Tabela Principal de Documentos
+model Documento {
+  id            String   @id @default(cuid())
+  titulo        String   @db.VarChar(500)
+  tipo          String   @db.VarChar(50)  // Contrato, Ofício, Edital, Memorando, PDF, Diversos
+  categoria     String   @db.VarChar(100)
+  descricao     String?  @db.Text
+  responsavelId String
+  responsavel   Usuario  @relation(fields: [responsavelId], references: [id], onDelete: Cascade)
+  data          DateTime
+  arquivo       String   @db.VarChar(500)
+  tamanhoArquivo Int?    // em bytes
+  dataVencimento DateTime?
+  fornecedor     String?  @db.VarChar(255)
+  fotos          String[]
+  numeroDocumento String? @unique @db.VarChar(100)
+  status        String   @default("Ativo") @db.VarChar(50) // Ativo, Arquivado, Deletado
+  nivelAcesso   String   @default("Público") @db.VarChar(50) // Público, Restrito, Confidencial
+  assinado      Boolean  @default(false)
+  deviceTimestamp DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relacionamentos
+  versoes       DocumentoVersao[]
+  historico     DocumentoHistorico[]
+  assinaturas   AssinaturaDigital[]
+  servicos      Servico[]
+
+  @@index([tipo])
+  @@index([categoria])
+  @@index([fornecedor])
+  @@index([status])
+  @@index([responsavelId])
+  @@index([numeroDocumento])
+  @@index([nivelAcesso])
+  @@map("documentos")
+}
+
+/// Versões de Documentos (Controle de Versão)
+model DocumentoVersao {
+  id         String   @id @default(cuid())
+  documentoId String
+  documento  Documento @relation(fields: [documentoId], references: [id], onDelete: Cascade)
+  versao     Int      @default(1)
+  arquivo    String   @db.VarChar(500)
+  mudancas   String?  @db.Text // descrição das mudanças
+  createdAt  DateTime @default(now())
+
+  @@index([documentoId])
+  @@index([versao])
+  @@map("documento_versoes")
+}
+
+/// Histórico de Ações em Documentos
+model DocumentoHistorico {
+  id         String   @id @default(cuid())
+  documentoId String
+  documento  Documento @relation(fields: [documentoId], references: [id], onDelete: Cascade)
+  acao       String   @db.VarChar(100) // Criado, Modificado, Visualizado, Compartilhado, Assinado
+  descricao  String?  @db.Text
+  usuarioEmail String? @db.VarChar(255)
+  endereco   String?  @db.VarChar(50)  // IP do usuário
+  createdAt  DateTime @default(now())
+
+  @@index([documentoId])
+  @@index([acao])
+  @@index([createdAt])
+  @@map("documento_historico")
+}
+
+/// Assinaturas Digitais
+model AssinaturaDigital {
+  id         String   @id @default(cuid())
+  documentoId String
+  documento  Documento @relation(fields: [documentoId], references: [id], onDelete: Cascade)
+  usuarioId  String
+  usuario    Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  assinatura String   @db.Text
+  certificado String? @db.VarChar(500)
+  dataAssinatura DateTime @default(now())
+  valido     Boolean  @default(true)
+
+  @@index([documentoId])
+  @@index([usuarioId])
+  @@map("assinaturas_digitais")
+}
+
+// ========================================
+// 3. COMPRAS
+// ========================================
+
+/// Tabela Principal de Compras
+model Compra {
+  id             String   @id @default(cuid())
+  numeroCompra   String   @unique @db.VarChar(100)
+  solicitanteId  String
+  solicitante    Usuario  @relation(fields: [solicitanteId], references: [id], onDelete: Cascade)
+  valor          Float
+  fornecedor     String   @db.VarChar(255)
+  fornecedorEmail String  @db.VarChar(255)
+  quantidade     Int
+  observacao     String?  @db.Text
+  status         String   @default("Solicitação") @db.VarChar(50) // Solicitação, Aprovação, Cotação, Compra, Recebimento, Entrega, Cancelada
+  aprovadoPorId  String?  
+  aprovadoPor    String?  @db.VarChar(255)
+  dataAprovacao  DateTime?
+  motivoRejeicao String?  @db.Text
+  dataPrevisao   DateTime?
+  dataEntrega    DateTime?
+  deviceTimestamp DateTime?
+  deletadoEm     DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relacionamentos
+  itens          CompraItem[]
+  pagamentos     Pagamento[]
+  documentosFiscais CompraDocumentoFiscal[]
+  historico      CompraHistorico[]
+  aprovacoesFluxo AprovacaoCompra[] @relation("aprovacoes")
+
+  @@index([numeroCompra])
+  @@index([status])
+  @@index([solicitanteId])
+  @@index([deletadoEm])
+  @@map("compras")
+}
+
+/// Itens da Compra
+model CompraItem {
+  id          String   @id @default(cuid())
+  compraId    String
+  compra      Compra   @relation(fields: [compraId], references: [id], onDelete: Cascade)
+  descricao   String   @db.VarChar(500)
+  quantidade  Int
+  valorUnitario Float
+  valorTotal  Float
+  especificacoes String? @db.Text
+
+  @@index([compraId])
+  @@map("compra_itens")
+}
+
+/// Pagamentos de Compras
+model Pagamento {
+  id          String   @id @default(cuid())
+  compraId    String
+  compra      Compra   @relation(fields: [compraId], references: [id], onDelete: Cascade)
+  valor       Float
+  dataPagamento DateTime
+  metodoPagamento String @db.VarChar(100) // Transferência, Cheque, Cartão, Dinheiro
+  numero      String?  @db.VarChar(100)
+  comprovante String?  @db.VarChar(500)
+  status      String   @default("Pendente") @db.VarChar(50) // Pendente, Aprovado, Rejeitado
+  createdAt   DateTime @default(now())
+
+  @@index([compraId])
+  @@index([status])
+  @@map("pagamentos")
+}
+
+/// Documentos fiscais vinculados à compra
+model CompraDocumentoFiscal {
+  id          String   @id @default(cuid())
+  compraId    String
+  compra      Compra   @relation(fields: [compraId], references: [id], onDelete: Cascade)
+  nomeArquivo String   @db.VarChar(500)
+  caminho     String   @db.VarChar(500)
+  numeroNota  String?  @db.VarChar(100)
+  dataEmissao DateTime?
+  valor       Float?
+  tipo        String?  @db.VarChar(100)
+  criadoPorId String?
+  criadoPor   String?  @db.VarChar(255)
+  createdAt   DateTime @default(now())
+
+  @@index([compraId])
+  @@map("compra_documentos_fiscais")
+}
+
+/// Histórico de ações em Compras
+model CompraHistorico {
+  id          String   @id @default(cuid())
+  compraId    String
+  compra      Compra   @relation(fields: [compraId], references: [id], onDelete: Cascade)
+  acao        String   @db.VarChar(100)
+  descricao   String?  @db.Text
+  usuarioId   String?  
+  usuarioEmail String? @db.VarChar(255)
+  endereco    String?  @db.VarChar(50)
+  createdAt   DateTime @default(now())
+
+  @@index([compraId])
+  @@map("compra_historico")
+}
+
+/// Fornecedores
+model Fornecedor {
+  id              String   @id @default(cuid())
+  nome            String   @db.VarChar(255)
+  nomeFantasia    String?  @db.VarChar(255)
+  cnpj            String   @unique @db.VarChar(14)
+  cpf             String?  @unique @db.VarChar(11)
+  email           String   @db.VarChar(255)
+  telefone        String?  @db.VarChar(20)
+  whatsapp        String?  @db.VarChar(20)
+  endereco        String?  @db.VarChar(500)
+  numero          String?  @db.VarChar(20)
+  complemento     String?  @db.VarChar(255)
+  bairro          String?  @db.VarChar(100)
+  cidade          String?  @db.VarChar(100)
+  estado          String?  @db.VarChar(2)
+  cep             String?  @db.VarChar(8)
+  contato         String?  @db.VarChar(255)
+  cargo           String?  @db.VarChar(100)
+  ativo           Boolean  @default(true)
+  status          String   @default("Ativo") @db.VarChar(50) // Ativo, Inativo, Bloqueado, Removido
+  avaliacaoMedia  Float?   @default(0)
+  totalCompras    Int      @default(0)
+  ultimaCompra    DateTime?
+  notas           String?  @db.Text
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([cnpj])
+  @@index([cpf])
+  @@index([email])
+  @@index([status])
+  @@index([ativo])
+  @@map("fornecedores")
+}
+
+/// Centros de Custo
+model CentroCusto {
+  id           String   @id @default(cuid())
+  codigo       String   @unique @db.VarChar(50)
+  nome         String   @db.VarChar(255)
+  descricao    String?  @db.Text
+  departamento String?  @db.VarChar(100)
+  responsavel  String?  @db.VarChar(255)
+  orcamento    Float?
+  utilizado    Float    @default(0)
+  ativo        Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([codigo])
+  @@index([ativo])
+  @@index([departamento])
+  @@map("centros_custo")
+}
+
+/// Fluxo de Aprovação de Compras
+model AprovacaoCompra {
+  id           String   @id @default(cuid())
+  compraId     String
+  compra       Compra   @relation("aprovacoes", fields: [compraId], references: [id], onDelete: Cascade)
+  nivel        Int      // 1, 2, 3, etc
+  statusAprovacao String @db.VarChar(50) // Pendente, Aprovado, Rejeitado, Aguardando
+  perfilRequerido String @db.VarChar(100) // Administrador, Gestor, Chefe, etc
+  usuarioId    String?
+  usuario      Usuario? @relation("aprovacoesConcedidas", fields: [usuarioId], references: [id], onDelete: SetNull)
+  motivo       String?  @db.Text
+  dataAprovacao DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([compraId])
+  @@index([nivel])
+  @@index([statusAprovacao])
+  @@index([perfilRequerido])
+  @@map("aprovacoes_compra")
+}
+
+// Relacionamentos adicionados em Compra
+// Adicionar no modelo Compra:
+// aprovacoesFluxo AprovacaoCompra[] @relation("aprovacoes")
+
+// Relacionamentos adicionados em Usuario
+// Adicionar no modelo Usuario:
+// aprovacoesConcedidas AprovacaoCompra[] @relation("aprovacoesConcedidas")
+
+// ========================================
+// 4. ESTOQUE
+// ========================================
+
+/// Tabela de Produtos
+model Produto {
+  id             String   @id @default(cuid())
+  nome           String   @db.VarChar(255)
+  codigo         String   @unique @db.VarChar(100)
+  categoria      String   @db.VarChar(100)
+  unidade        String   @db.VarChar(20) // Un, Kg, L, M, M2, M3
+  quantidade     Int      @default(0)
+  estoqueMinimo  Int      @default(0)
+  estoqueMaximo  Int?
+  localizacao    String?  @db.VarChar(255)
+  descricao      String?  @db.Text
+  ultimaReposicao DateTime?
+  preco          Float?
+  fornecedor     String?  @db.VarChar(255)
+  ativo          Boolean  @default(true)
+  deviceTimestamp DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relacionamentos
+  movimentacoes  MovimentacaoEstoque[]
+
+  @@index([codigo])
+  @@index([categoria])
+  @@index([ativo])
+  @@map("produtos")
+}
+
+/// Compras geradas automaticamente a partir do estoque baixo
+/// Movimentações de Estoque
+model MovimentacaoEstoque {
+  id          String   @id @default(cuid())
+  produtoId   String
+  produto     Produto  @relation(fields: [produtoId], references: [id], onDelete: Cascade)
+  usuarioId   String?
+  usuario     Usuario? @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+  tipo        String   @db.VarChar(50) // Entrada, Saída, Reposição
+  quantidade  Int
+  motivo      String   @db.VarChar(255)
+  referencia  String?  @db.VarChar(100) // número de compra, transferência, etc
+  documento   String?  @db.VarChar(500)
+  createdAt   DateTime @default(now())
+
+  @@index([produtoId])
+  @@index([usuarioId])
+  @@index([tipo])
+  @@index([createdAt])
+  @@map("movimentacoes_estoque")
+}
+
+// ========================================
+// 5. AGENDA
+// ========================================
+
+/// Tabela de Eventos
+model Evento {
+  id            String   @id @default(cuid())
+  titulo        String   @db.VarChar(255)
+  descricao     String?  @db.Text
+  responsavelId String
+  responsavel   Usuario  @relation(fields: [responsavelId], references: [id], onDelete: Cascade)
+  dataInicio    DateTime
+  dataFim       DateTime?
+  local         String?  @db.VarChar(255)
+  tipo          String   @db.VarChar(50) // Reunião, Evento, Reserva, Capacitação
+  status        String   @default("Ativo") @db.VarChar(50) // Ativo, Concluído, Cancelado
+  participantes String?  @db.Text // JSON com lista de participantes
+  anexos        String?  @db.VarChar(500)
+  deviceTimestamp DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([dataInicio])
+  @@index([responsavelId])
+  @@index([tipo])
+  @@index([status])
+  @@map("eventos")
+}
+
+// ========================================
+// 6. OCORRÊNCIAS
+// ========================================
+
+/// Tabela de Ocorrências
+model Ocorrencia {
+  id               String    @id @default(cuid())
+  numeroOcorrencia String    @unique @db.VarChar(100)
+  titulo           String    @db.VarChar(500)
+  descricao        String    @db.Text
+  local            String    @db.VarChar(255)
+  setor            String    @db.VarChar(100)
+  responsavelId    String
+  responsavel      Usuario   @relation(fields: [responsavelId], references: [id], onDelete: Cascade)
+  data             DateTime  @default(now())
+  prioridade       String    @db.VarChar(50) // Baixa, Média, Alta, Crítica
+  status           String    @default("Aberto") @db.VarChar(50) // Aberto, Em andamento, Resolvido, Encerrado, Reaberto
+  fotos            String[]
+  anexos           String[]
+  dataPrazo        DateTime?
+  dataResolucao    DateTime?
+  deviceTimestamp  DateTime?
+  deletadoEm       DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  historico        OcorrenciaHistorico[]
+  comentarios      OcorrenciaComentario[]
+
+  @@index([numeroOcorrencia])
+  @@index([status])
+  @@index([prioridade])
+  @@index([responsavelId])
+  @@index([setor])
+  @@index([deletadoEm])
+  @@map("ocorrencias")
+}
+
+model OcorrenciaHistorico {
+  id            String      @id @default(cuid())
+  ocorrenciaId  String
+  ocorrencia    Ocorrencia  @relation(fields: [ocorrenciaId], references: [id], onDelete: Cascade)
+  acao          String      @db.VarChar(100)
+  descricao     String?     @db.Text
+  usuarioId     String?     @db.VarChar(255)
+  usuarioEmail  String?     @db.VarChar(255)
+  endereco      String?     @db.VarChar(100)
+  createdAt     DateTime    @default(now())
+
+  @@index([ocorrenciaId])
+  @@index([acao])
+  @@map("ocorrencia_historico")
+}
+
+model OcorrenciaComentario {
+  id            String      @id @default(cuid())
+  ocorrenciaId  String
+  ocorrencia    Ocorrencia  @relation(fields: [ocorrenciaId], references: [id], onDelete: Cascade)
+  usuarioId     String
+  usuario       Usuario     @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  conteudo      String      @db.Text
+  criadoEm      DateTime    @default(now())
+
+  @@index([ocorrenciaId])
+  @@index([usuarioId])
+  @@map("ocorrencia_comentarios")
+}
+
+/// Tabela de Serviços e Manutenções
+model Servico {
+  id                 String    @id @default(cuid())
+  numeroServico      String    @unique @db.VarChar(100)
+  tipoServico        String    @db.VarChar(50) @default("Contratado")
+  nome               String    @db.VarChar(500)
+  equipamento        String?   @db.VarChar(255)
+  escala             String?   @db.VarChar(255)
+  categoria          String    @db.VarChar(100)
+  fornecedor         String?   @db.VarChar(255)
+  documentoId        String?   @db.VarChar(255)
+  documento          Documento? @relation(fields: [documentoId], references: [id])
+  dataInicio         DateTime?
+  dataVencimento     DateTime?
+  periodicidade      String?   @db.VarChar(100)
+  ultimaManutencao   String?   @db.Text
+  proximaManutencao  DateTime?
+  status             String?   @db.VarChar(100)
+  observacoes        String?   @db.Text
+  fotos              String[]
+  anexos             String[]
+  responsavelId      String
+  responsavel        Usuario   @relation(fields: [responsavelId], references: [id], onDelete: Cascade)
+  responsavelEmail   String    @db.VarChar(255)
+  userIp             String?   @db.VarChar(100)
+  deletadoEm         DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  historico          ServicoHistorico[]
+
+  @@index([tipoServico])
+  @@index([equipamento])
+  @@index([categoria])
+  @@index([fornecedor])
+  @@index([status])
+  @@index([dataInicio])
+  @@index([dataVencimento])
+  @@index([proximaManutencao])
+  @@index([deletadoEm])
+  @@index([documentoId])
+  @@map("servicos")
+}
+
+model ServicoHistorico {
+  id            String   @id @default(cuid())
+  servicoId     String
+  servico       Servico  @relation(fields: [servicoId], references: [id], onDelete: Cascade)
+  acao          String   @db.VarChar(100)
+  descricao     String?  @db.Text
+  usuarioId     String?  @db.VarChar(255)
+  usuarioEmail  String?  @db.VarChar(255)
+  endereco      String?  @db.VarChar(100)
+  createdAt     DateTime @default(now())
+
+  @@index([servicoId])
+  @@map("servico_historico")
+}
+
+// ========================================
+// 7. COMUNICAÇÃO
+// ========================================
+
+/// Tabela de Comunicados
+model Comunicado {
+  id        String   @id @default(cuid())
+  titulo    String   @db.VarChar(500)
+  conteudo  String   @db.Text
+  autorId   String
+  autor     Usuario  @relation(fields: [autorId], references: [id], onDelete: Cascade)
+  tipo      String   @db.VarChar(50) // Aviso, Comunicado, Notificação, Circular
+  anexos    String?  @db.VarChar(500)
+  status    String   @default("Ativo") @db.VarChar(50) // Ativo, Arquivado, Deletado
+  dataPublicacao DateTime @default(now())
+  dataVencimento DateTime?
+  deviceTimestamp DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tipo])
+  @@index([status])
+  @@index([autorId])
+  @@map("comunicados")
+}
+
+/// Tabela de Mensagens (Sistema de Mensageria)
+model Mensagem {
+  id            String   @id @default(cuid())
+  remetenteId   String
+  remetente     Usuario  @relation("remetente", fields: [remetenteId], references: [id], onDelete: Cascade)
+  destinatarioId String
+  destinatario  Usuario  @relation("destinatario", fields: [destinatarioId], references: [id], onDelete: Cascade)
+  assunto       String   @db.VarChar(255)
+  conteudo      String   @db.Text
+  anexos        String?  @db.VarChar(500)
+  lida          Boolean  @default(false)
+  dataLeitura   DateTime?
+  status        String   @default("Enviada") @db.VarChar(50) // Rascunho, Enviada, Deletada
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([remetenteId])
+  @@index([destinatarioId])
+  @@index([lida])
+  @@index([createdAt])
+  @@map("mensagens")
+}
+
+// ========================================
+// 8. NOTIFICAÇÕES
+// ========================================
+
+/// Tabela de Notificações
+model Notificacao {
+  id            String   @id @default(cuid())
+  usuarioId     String
+  usuario       Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  titulo        String   @db.VarChar(255)
+  mensagem      String   @db.Text
+  tipo          String   @db.VarChar(50) // info, aviso, erro, sucesso, tarefa
+  referencia    String?  @db.VarChar(100) // id da entidade relacionada (compra, documento, etc)
+  moduloRef     String?  @db.VarChar(50)  // modulo: compras, documentos, etc
+  lida          Boolean  @default(false)
+  dataLeitura   DateTime?
+  acao          String?  @db.VarChar(255) // URL para redirecionamento
+  prioridade    Int      @default(0)
+  createdAt     DateTime @default(now())
+  expiraEm      DateTime?
+
+  @@index([usuarioId])
+  @@index([lida])
+  @@index([tipo])
+  @@index([moduloRef])
+  @@index([createdAt])
+  @@map("notificacoes")
+}
+
+// ========================================
+// 9. LOGS DO SISTEMA
+// ========================================
+
+/// Tabela de Logs
+model Log {
+  id            String   @id @default(cuid())
+  usuarioId     String?
+  usuario       Usuario? @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+  acao          String   @db.VarChar(100) // criar, ler, atualizar, deletar, fazer login, mudar senha
+  modulo        String   @db.VarChar(100) // usuarios, documentos, compras, estoque, etc
+  tabela        String?  @db.VarChar(100) // tabela afetada
+  registroId    String?  @db.VarChar(100) // ID do registro modificado
+  tipoOperacao  String   @db.VarChar(50) // INSERT, UPDATE, DELETE, SELECT
+  dadosAntes    String?  @db.Text // JSON dos dados anteriores
+  dadosDepois   String?  @db.Text // JSON dos dados novos
+  endereco      String?  @db.VarChar(50) // IP
+  userAgent     String?  @db.Text
+  status        String   @db.VarChar(50) // sucesso, erro, aviso
+  mensagem      String?  @db.Text
+  createdAt     DateTime @default(now())
+
+  @@index([usuarioId])
+  @@index([modulo])
+  @@index([tabela])
+  @@index([acao])
+  @@index([tipoOperacao])
+  @@index([createdAt])
+  @@map("logs")
+}
+
+// ========================================
+// 10. AUDITORIA E CONFIGURAÇÕES
+// ========================================
+
+/// Tabela de Auditoria (para histórico completo)
+model AuditoriaRegistro {
+  id            String   @id @default(cuid())
+  tabela        String   @db.VarChar(100)
+  registroId    String   @db.VarChar(100)
+  tipoOperacao  String   @db.VarChar(50) // INSERT, UPDATE, DELETE
+  dadosAntes    String?  @db.Text // JSON
+  dadosDepois   String?  @db.Text // JSON
+  usuarioId     String?  @db.VarChar(100)
+  endereco      String?  @db.VarChar(50)
+  createdAt     DateTime @default(now())
+
+  @@index([tabela])
+  @@index([registroId])
+  @@index([createdAt])
+  @@map("auditoria_registros")
+}
+
+/// Configurações do Sistema
+model ConfiguracaoSistema {
+  id            String   @id @default(cuid())
+  chave         String   @unique @db.VarChar(100)
+  valor         String   @db.Text
+  descricao     String?  @db.Text
+  tipo          String   @db.VarChar(50) // texto, numero, booleano, json
+  updatedAt     DateTime @updatedAt
+
+  @@map("configuracoes_sistema")
+}

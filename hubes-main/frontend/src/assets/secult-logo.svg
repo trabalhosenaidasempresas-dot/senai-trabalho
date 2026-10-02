@@ -1,0 +1,17 @@
+<svg width="300" height="64" viewBox="0 0 300 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title">
+  <title id="title">SECULT - Secretaria de Cultura</title>
+  <defs>
+    <linearGradient id="g" x1="0" x2="1">
+      <stop offset="0" stop-color="#05323a" />
+      <stop offset="1" stop-color="#0b5563" />
+    </linearGradient>
+  </defs>
+  <rect width="300" height="64" rx="10" fill="none" />
+  <!-- emblem -->
+  <g transform="translate(12,8)">
+    <circle cx="24" cy="24" r="24" fill="#d99b00" />
+    <path d="M10 28 C14 18, 34 18, 38 28 C34 24, 22 26, 18 30 C22 20, 34 20, 38 24" fill="none" stroke="#05323a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+    <text x="54" y="30" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="700" fill="#05323a">SECULT</text>
+    <text x="54" y="48" font-family="Inter, Arial, sans-serif" font-size="10" fill="#374151">Secretaria de Cultura</text>
+  </g>
+</svg>

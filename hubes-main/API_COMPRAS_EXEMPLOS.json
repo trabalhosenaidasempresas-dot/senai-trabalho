@@ -1,0 +1,338 @@
+{
+  "info": {
+    "name": "SIGA Secult - Módulo Compras",
+    "description": "Coleção de exemplos de API para o módulo de Compras",
+    "version": "1.0.0"
+  },
+  "baseUrl": "http://localhost:3000/api",
+  "examples": [
+    {
+      "name": "1. Criar uma Compra Simples",
+      "method": "POST",
+      "url": "/compras",
+      "headers": {
+        "Authorization": "Bearer TOKEN_AQUI",
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "numeroCompra": "CMP-2026-001",
+        "fornecedor": "Papelaria Premium",
+        "centoCusto": "Administrativo",
+        "valor": 710.00,
+        "observacao": "Compra para suprimentos gerais",
+        "status": "Solicitação",
+        "dataPrevisao": "2026-08-15"
+      }
+    },
+    {
+      "name": "2. Criar uma Compra com Itens Detalhados",
+      "method": "POST",
+      "url": "/compras",
+      "headers": {
+        "Authorization": "Bearer TOKEN_AQUI",
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "numeroCompra": "CMP-2026-002",
+        "fornecedor": "Papelaria Premium",
+        "cnpj": "12345678000195",
+        "centoCusto": "Administrativo",
+        "observacao": "Compra para estoque de suprimentos",
+        "status": "Solicitação",
+        "dataPrevisao": "2026-08-20",
+        "itens": [
+          {
+            "descricao": "Papel A4 75g",
+            "quantidade": 20,
+            "valorUnitario": 35.50,
+            "especificacoes": "Resma com 500 folhas - Marca Premium"
+          },
+          {
+            "descricao": "Caneta Azul BIC",
+            "quantidade": 10,
+            "valorUnitario": 15.00,
+            "especificacoes": "Caixa com 50 unidades"
+          },
+          {
+            "descricao": "Lápis HB #2",
+            "quantidade": 5,
+            "valorUnitario": 12.00,
+            "especificacoes": "Caixa com 144 unidades"
+          }
+        ]
+      }
+    },
+    {
+      "name": "3. Listar Compras com Filtros",
+      "method": "GET",
+      "url": "/compras?pagina=1&limite=10&status=Solicitação&search=CMP&sortField=createdAt&sortOrder=desc",
+      "headers": {
+        "Authorization": "Bearer TOKEN_AQUI"
+      }
+    },
+    {
+      "name": "4. Obter Detalhes de uma Compra",
+      "method": "GET",
+      "url": "/compras/compra-id-aqui",
+      "headers": {
+        "Authorization": "Bearer TOKEN_AQUI"
+      }
+    },
+    {
+      "name": "5. Atualizar uma Compra",
+      "method": "PUT",
+      "url": "/compras/compra-id-aqui",
+      "headers": {
+        "Authorization": "Bearer TOKEN_AQUI",
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "observacao": "Compra revisada - aumentar quantidade de papel",
+        "dataPrevisao": "2026-08-25",
+        "itens": [
+          {
+            "descricao": "Papel A4 75g",
+            "quantidade": 25,
+            "valorUnitario": 35.50,
+            "especificacoes": "Resma com 500 folhas"
+          }
+        ]
+      }
+    },
+    {
+      "name": "6. Aprovar uma Compra (Simples)",
+      "method": "POST",
+      "url": "/compras/compra-id-aqui/aprovacao",
+      "headers": {
+        "Authorization": "Bearer TOKEN_AQUI",
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "aprovado": true
+      }
+    },
+    {
+      "name": "7. Rejeitar uma Compra (Simples)",
+      "method": "POST",
+      "url": "/compras/compra-id-aqui/aprovacao",
+      "headers": {
+        "Authorization": "Bearer TOKEN_AQUI",
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "aprovado": false,
+        "motivoRejeicao": "Valor acima do orçamento autorizado para este período"
+      }
+    },
+    {
+      "name": "8. Aprovar no Fluxo Multinível",
+      "method": "POST",
+      "url": "/compras/compra-id-aqui/fluxo-aprovacao/aprovar",
+      "headers": {
+        "Authorization": "Bearer TOKEN_AQUI",
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "nivel": 1,
+        "motivo": "Aprovado. Valor dentro dos limites, fornecedor confiável"
+      }
+    },
+    {
+      "name": "9. Rejeitar no Fluxo Multinível",
+      "method": "POST",
+      "url": "/compras/compra-id-aqui/fluxo-aprovacao/rejeitar",
+      "headers": {
+        "Authorization": "Bearer TOKEN_AQUI",
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "nivel": 2,
+        "motivo": "Solicitação de orçamento mais competitivo de 3 fornecedores"
+      }
+    },
+    {
+      "name": "10. Obter Fluxo de Aprovação",
+      "method": "GET",
+      "url": "/compras/compra-id-aqui/fluxo-aprovacao",
+      "headers": {
+        "Authorization": "Bearer TOKEN_AQUI"
+      }
+    },
+    {
+      "name": "11. Listar Histórico de uma Compra",
+      "method": "GET",
+      "url": "/compras/compra-id-aqui/historico",
+      "headers": {
+        "Authorization": "Bearer TOKEN_AQUI"
+      }
+    },
+    {
+      "name": "12. Upload de Documento Fiscal (multipart/form-data)",
+      "method": "POST",
+      "url": "/compras/compra-id-aqui/documentos-fiscais",
+      "headers": {
+        "Authorization": "Bearer TOKEN_AQUI"
+      },
+      "formData": {
+        "arquivo": "nf-123456.pdf",
+        "numeroNota": "123456",
+        "dataEmissao": "2026-07-15",
+        "valor": "1500.00",
+        "tipo": "NF-e"
+      }
+    },
+    {
+      "name": "13. Listar Documentos Fiscais de uma Compra",
+      "method": "GET",
+      "url": "/compras/compra-id-aqui/documentos-fiscais",
+      "headers": {
+        "Authorization": "Bearer TOKEN_AQUI"
+      }
+    },
+    {
+      "name": "14. Download de Documento Fiscal",
+      "method": "GET",
+      "url": "/compras/compra-id-aqui/documentos-fiscais/documento-id-aqui/download",
+      "headers": {
+        "Authorization": "Bearer TOKEN_AQUI"
+      },
+      "note": "Retorna o arquivo para download"
+    },
+    {
+      "name": "15. Deletar Documento Fiscal",
+      "method": "DELETE",
+      "url": "/compras/compra-id-aqui/documentos-fiscais/documento-id-aqui",
+      "headers": {
+        "Authorization": "Bearer TOKEN_AQUI"
+      }
+    },
+    {
+      "name": "16. Deletar uma Compra (Soft Delete)",
+      "method": "DELETE",
+      "url": "/compras/compra-id-aqui",
+      "headers": {
+        "Authorization": "Bearer TOKEN_AQUI"
+      }
+    },
+    {
+      "name": "17. Criar Fornecedor",
+      "method": "POST",
+      "url": "/compras/fornecedores",
+      "headers": {
+        "Authorization": "Bearer TOKEN_AQUI",
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "nome": "Nova Papelaria LTDA",
+        "nomeFantasia": "Nova Papelaria",
+        "cnpj": "11111111000180",
+        "email": "vendas@novapapelaria.com.br",
+        "telefone": "(11) 3333-3333",
+        "whatsapp": "(11) 99999-9999",
+        "endereco": "Rua Nova",
+        "numero": "100",
+        "bairro": "Centro",
+        "cidade": "São Paulo",
+        "estado": "SP",
+        "cep": "01310100",
+        "contato": "José da Silva",
+        "cargo": "Gerente de Vendas"
+      }
+    },
+    {
+      "name": "18. Listar Fornecedores",
+      "method": "GET",
+      "url": "/compras/fornecedores/listar?pagina=1&limite=10&search=papelaria&status=Ativo",
+      "headers": {
+        "Authorization": "Bearer TOKEN_AQUI"
+      }
+    },
+    {
+      "name": "19. Obter Detalhes do Fornecedor",
+      "method": "GET",
+      "url": "/compras/fornecedores/fornecedor-id-aqui",
+      "headers": {
+        "Authorization": "Bearer TOKEN_AQUI"
+      }
+    },
+    {
+      "name": "20. Atualizar Fornecedor",
+      "method": "PUT",
+      "url": "/compras/fornecedores/fornecedor-id-aqui",
+      "headers": {
+        "Authorization": "Bearer TOKEN_AQUI",
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "email": "novo-email@novapapelaria.com.br",
+        "telefone": "(11) 4444-4444",
+        "status": "Ativo"
+      }
+    },
+    {
+      "name": "21. Deletar Fornecedor",
+      "method": "DELETE",
+      "url": "/compras/fornecedores/fornecedor-id-aqui",
+      "headers": {
+        "Authorization": "Bearer TOKEN_AQUI"
+      }
+    },
+    {
+      "name": "22. Listar Centros de Custo",
+      "method": "GET",
+      "url": "/compras/centros-custo/listar?pagina=1&limite=10&search=administrativo",
+      "headers": {
+        "Authorization": "Bearer TOKEN_AQUI"
+      }
+    },
+    {
+      "name": "23. Obter Centro de Custo",
+      "method": "GET",
+      "url": "/compras/centros-custo/centro-id-aqui",
+      "headers": {
+        "Authorization": "Bearer TOKEN_AQUI"
+      }
+    },
+    {
+      "name": "24. Obter Estatísticas Gerais",
+      "method": "GET",
+      "url": "/compras/estatisticas/geral",
+      "headers": {
+        "Authorization": "Bearer TOKEN_AQUI"
+      }
+    },
+    {
+      "name": "25. Obter Estatísticas por Status",
+      "method": "GET",
+      "url": "/compras/estatisticas/por-status",
+      "headers": {
+        "Authorization": "Bearer TOKEN_AQUI"
+      }
+    },
+    {
+      "name": "26. Obter Estatísticas por Centro de Custo",
+      "method": "GET",
+      "url": "/compras/estatisticas/por-centro-custo",
+      "headers": {
+        "Authorization": "Bearer TOKEN_AQUI"
+      }
+    },
+    {
+      "name": "27. Gerar Relatório JSON",
+      "method": "GET",
+      "url": "/compras/relatorios/compras?dataInicio=2026-01-01&dataFim=2026-12-31&status=Compra&formato=json",
+      "headers": {
+        "Authorization": "Bearer TOKEN_AQUI"
+      }
+    },
+    {
+      "name": "28. Gerar Relatório CSV",
+      "method": "GET",
+      "url": "/compras/relatorios/compras?dataInicio=2026-01-01&dataFim=2026-12-31&formato=csv",
+      "headers": {
+        "Authorization": "Bearer TOKEN_AQUI"
+      },
+      "note": "Retorna arquivo CSV para download"
+    }
+  ]
+}

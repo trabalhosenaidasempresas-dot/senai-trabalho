@@ -1,0 +1,169 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: siga_secult_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: siga_user
+      POSTGRES_PASSWORD: siga_password
+      POSTGRES_DB: siga_secult
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U siga_user -d siga_secult"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - siga_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: siga_secult_redis
+    restart: unless-stopped
+    expose:
+      - "6379"
+    command: ["redis-server", "--save", "900", "1", "300", "10", "900", "10000"]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - siga_network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: siga_secult_backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://siga_user:siga_password@postgres:5432/siga_secult
+      REDIS_URL: redis://redis:6379
+    volumes:
+      - ./backend/uploads:/app/backend/uploads
+    expose:
+      - "3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    command: ["sh", "-c", "until npx prisma db pull; do sleep 2; done; npx prisma migrate deploy && npm start"]
+    networks:
+      - siga_network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: /api
+    container_name: siga_secult_frontend
+    restart: unless-stopped
+    environment:
+      VITE_API_URL: /api
+    expose:
+      - "3001"
+    ports:
+      - "3001:3001"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3001/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - siga_network
+
+  nginx:
+    image: nginx:stable-alpine
+    container_name: siga_secult_nginx
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - siga_network
+
+  adminer:
+    image: adminer:latest
+    container_name: siga_secult_adminer
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - siga_network
+
+  backup:
+    image: postgres:15-alpine
+    container_name: siga_secult_backup
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - postgres_backups:/backups
+    environment:
+      PGPASSWORD: siga_password
+      PGUSER: siga_user
+      PGDATABASE: siga_secult
+      PGHOST: postgres
+    command: ["sh", "-c", "while true; do ts=$$(date +\"%Y%m%d_%H%M%S\"); mkdir -p /backups/$$ts; pg_dumpall -h $$PGHOST -U $$PGUSER > /backups/$$ts/siga_secult.sql; find /backups -type f -mtime +7 -delete; sleep 86400; done"]
+    networks:
+      - siga_network
+
+volumes:
+  postgres_data:
+  postgres_backups:
+
+networks:
+  siga_network:
+    driver: bridge
